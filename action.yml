@@ -35,7 +35,7 @@ inputs:
   apt-cache-version:
     description: "Cache-busting version passed to awalsh128/cache-apt-pkgs-action. Bump when the package set changes."
     required: false
-    default: "1"
+    default: "2"
   setup-display:
     description: "Start Xvfb and export DISPLAY (Linux only)."
     required: false

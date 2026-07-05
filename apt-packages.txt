@@ -17,7 +17,11 @@
 xvfb dbus dbus-x11 fluxbox
 at-spi2-core
 # winit / xcb client libraries (AccessKit, Qt, egui windows).
-libxkbcommon-x11-0 libxkbcommon-x11-dev
+# libxkbcommon-dev ships the libxkbcommon.so dev symlink that `-lxkbcommon`
+# needs; the -x11-dev variants alone don't provide it, so any job that
+# builds/links xa11y on Linux (e.g. `cargo test --workspace`, which pulls in
+# the Wayland input backend) fails to link without it.
+libxkbcommon-dev libxkbcommon-x11-0 libxkbcommon-x11-dev
 libxcursor1 libxrandr2 libxi6
 libx11-xcb1 libxcb-render0 libxcb-shape0 libxcb-xfixes0
 libegl1 libglib2.0-0 libfontconfig1 libdbus-1-3
