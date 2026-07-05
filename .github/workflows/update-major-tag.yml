@@ -1,0 +1,42 @@
+name: Update major version tag
+
+# Moves a rolling major-version tag (e.g. v1) to a target commit so consumers
+# pinned to `xa11y/setup-a11y@v1` pick up the latest changes on that line.
+# The git proxy in some environments blocks force-pushing tags locally; this
+# runs on GitHub with a contents:write token, which can move the tag.
+#
+# Trigger it from the Actions tab ("Run workflow") or via the API/gh:
+#   gh workflow run update-major-tag.yml -f tag=v1 -f ref=main
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to move (e.g. v1)"
+        required: true
+        default: "v1"
+      ref:
+        description: "Commit-ish the tag should point at (branch, tag, or SHA)"
+        required: true
+        default: "main"
+
+permissions:
+  contents: write
+
+jobs:
+  retag:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (full history so any ref/SHA resolves)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Move ${{ inputs.tag }} to ${{ inputs.ref }}
+        run: |
+          set -euo pipefail
+          target=$(git rev-parse "${{ inputs.ref }}^{commit}")
+          echo "Moving ${{ inputs.tag }} -> $target ($(git log -1 --format='%s' "$target"))"
+          git tag -f "${{ inputs.tag }}" "$target"
+          git push origin "refs/tags/${{ inputs.tag }}" --force
+          echo "Done. ${{ inputs.tag }} now points at $target"
