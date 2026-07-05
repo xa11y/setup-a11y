@@ -96,6 +96,21 @@ runs:
         echo "Resolved apt packages: $out"
         echo "packages=$out" >> "$GITHUB_OUTPUT"
 
+    - name: Refresh apt package lists
+      # cache-apt-pkgs-action resolves each (unpinned) package name to the exact
+      # version the runner's apt metadata reports, then downloads that specific
+      # .deb. GitHub runner images ship apt lists that lag the Ubuntu security
+      # mirror, so a package that just got a security point-release (e.g.
+      # libnghttp2-dev, pulled in transitively via libwebkit2gtk) resolves to a
+      # version already purged from the pool — the download 404s and the whole
+      # all-or-nothing install aborts, leaving ZERO packages installed. Refresh
+      # the lists first so resolution matches what is actually downloadable.
+      # (On a warm cache the .debs are restored from GitHub's cache and the
+      # mirror is never touched, so this only matters on a cache miss.)
+      if: ${{ runner.os == 'Linux' && inputs.install-deps == 'true' }}
+      shell: bash
+      run: sudo apt-get update
+
     - name: Install system dependencies
       # cache-apt-pkgs-action caches the .debs so warm runs finish in ~10s
       # instead of the ~60s a cold apt-get update + install of ~30 packages

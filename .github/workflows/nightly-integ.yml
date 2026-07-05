@@ -1,0 +1,62 @@
+name: Nightly integ (xa11y)
+
+# Regression canary: runs the real xa11y integration tests against the action
+# as published on main. Catches breakage that hermetic CI can't see — e.g. an
+# Ubuntu security point-release purging a transitively-pinned .deb (the
+# libnghttp2-dev 404 that installed zero packages), or upstream xa11y changes
+# that need new system deps. Runs nightly and on demand.
+
+on:
+  schedule:
+    - cron: "0 7 * * *" # 07:00 UTC daily
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "xa11y/xa11y ref to test against"
+        required: false
+        default: "main"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nightly-integ
+  cancel-in-progress: false
+
+jobs:
+  integ:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout xa11y/xa11y
+        uses: actions/checkout@v4
+        with:
+          repository: xa11y/xa11y
+          ref: ${{ github.event.inputs.ref || 'main' }}
+          # GITHUB_TOKEN can read xa11y/xa11y if it is public. If it is private,
+          # add a repo secret INTEG_REPO_TOKEN (a PAT / fine-grained token with
+          # read access to xa11y/xa11y) and it will be used instead.
+          token: ${{ secrets.INTEG_REPO_TOKEN || github.token }}
+
+      - name: Set up accessibility environment (setup-a11y@main)
+        uses: xa11y/setup-a11y@main
+        with:
+          package-groups: base gtk electron
+          setup-window-manager: "true"
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: nightly-integ-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: nightly-integ-cargo-
+
+      - name: Run xa11y integration tests
+        # Mirrors the Linux job that surfaced the -lxkbcommon failure. Adjust to
+        # the specific integ crate/command if xa11y narrows this later.
+        run: cargo test --workspace --no-fail-fast

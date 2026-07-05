@@ -1,0 +1,89 @@
+name: CI
+
+# Validates the setup-a11y action itself on every PR/push. Hermetic — no
+# secrets, no external repos — so it also runs on fork PRs. It exercises the
+# two regressions that have bitten consumers:
+#   1. base group missing libxkbcommon-dev -> `-lxkbcommon` fails to link
+#   2. a stale apt version pin 404ing -> all-or-nothing install lands 0 packages
+#      (the gtk/electron groups pull in libwebkit2gtk -> libnghttp2-dev, the
+#       transitive package whose security point-release triggered the 404).
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  linux:
+    name: linux (${{ matrix.groups }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # 'base' alone must link xkbcommon; 'base gtk electron' exercises the
+        # full apt resolution path (incl. libwebkit2gtk -> libnghttp2-dev).
+        groups:
+          - "base"
+          - "base gtk electron"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run setup-a11y (${{ matrix.groups }})
+        uses: ./
+        with:
+          package-groups: ${{ matrix.groups }}
+          setup-window-manager: "true"
+
+      - name: Assert libxkbcommon dev symlink is present and links
+        shell: bash
+        run: |
+          set -euo pipefail
+          # xkbcommon.pc + the libxkbcommon.so dev symlink ship in libxkbcommon-dev.
+          pkg-config --exists --print-errors xkbcommon
+          cat > /tmp/xkb_link_check.c <<'EOF'
+          #include <xkbcommon/xkbcommon.h>
+          int main(void) {
+            struct xkb_context *ctx = xkb_context_new(XKB_CONTEXT_NO_FLAGS);
+            xkb_context_unref(ctx);
+            return 0;
+          }
+          EOF
+          # This is the exact `-lxkbcommon` link that was failing for consumers.
+          cc /tmp/xkb_link_check.c -o /tmp/xkb_link_check $(pkg-config --cflags --libs xkbcommon)
+          /tmp/xkb_link_check
+          echo "OK: compiled, linked against -lxkbcommon, and ran"
+
+      - name: Assert the accessibility environment came up
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "${DISPLAY:-}"                      && echo "DISPLAY=$DISPLAY"
+          test "${XA11Y_A11Y_READY:-}" = "1"          && echo "XA11Y_A11Y_READY ok"
+          test -n "${DBUS_SESSION_BUS_ADDRESS:-}"     && echo "DBUS session bus set"
+          # The AT-SPI status object should answer on the session bus.
+          dbus-send --session --print-reply --dest=org.a11y.Bus /org/a11y/bus \
+            org.freedesktop.DBus.Properties.Get \
+            string:org.a11y.Status string:IsEnabled
+
+  # Smoke-test the non-Linux paths so a change to the action can't silently
+  # break them (macOS grants/warns about TCC; Windows is a no-op).
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run setup-a11y (macOS path)
+        uses: ./
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run setup-a11y (Windows no-op)
+        uses: ./
