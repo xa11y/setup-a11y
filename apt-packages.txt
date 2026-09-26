@@ -7,10 +7,7 @@
 #   # [group]      starts a named group
 #   pkg pkg ...    one or more packages belonging to the current group
 # Blank lines and any other `#` comment lines are ignored. Package order is
-# preserved so the awalsh128/cache-apt-pkgs-action cache key stays stable.
-#
-# When you change a group's contents, bump `apt-cache-version` on the
-# setup-a11y action call (or its default) so the cached .debs invalidate.
+# preserved in the apt install command.
 
 # [base]
 # Headless display + session/accessibility bus that every GUI a11y test needs.

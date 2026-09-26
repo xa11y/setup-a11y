@@ -4,9 +4,8 @@ name: CI
 # secrets, no external repos — so it also runs on fork PRs. It exercises the
 # two regressions that have bitten consumers:
 #   1. base group missing libxkbcommon-dev -> `-lxkbcommon` fails to link
-#   2. a stale apt version pin 404ing -> all-or-nothing install lands 0 packages
-#      (the gtk/electron groups pull in libwebkit2gtk -> libnghttp2-dev, the
-#       transitive package whose security point-release triggered the 404).
+#   2. a cached apt install reporting success while restoring zero packages,
+#      or a stale apt version pin 404ing before the full group is installed.
 
 on:
   pull_request:
@@ -71,6 +70,20 @@ jobs:
           dbus-send --session --print-reply --dest=org.a11y.Bus /org/a11y/bus \
             org.freedesktop.DBus.Properties.Get \
             string:org.a11y.Status string:IsEnabled
+          # AT-SPI has a separate bus. Its address and registry must both be
+          # live, not just the session bus environment variables.
+          bus_reply=$(dbus-send --session --print-reply --dest=org.a11y.Bus \
+            /org/a11y/bus org.a11y.Bus.GetAddress)
+          grep -q 'unix:' <<< "$bus_reply"
+          pgrep -f '[a]t-spi2-registryd'
+
+      - name: Assert full group libraries are installed
+        if: matrix.groups == 'base gtk electron'
+        shell: bash
+        run: |
+          set -euo pipefail
+          pkg-config --exists --print-errors gtk4 webkit2gtk-4.1
+          dpkg-query -W -f='${Status}\n' libnss3 | grep -qx 'install ok installed'
 
   # Smoke-test the non-Linux paths so a change to the action can't silently
   # break them (macOS grants/warns about TCC; Windows is a no-op).
