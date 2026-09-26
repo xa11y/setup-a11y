@@ -20,6 +20,16 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  canary-reporter:
+    name: Canary issue reporter
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: node --test scripts/report-canary-failure.test.js
+
   linux:
     name: linux (${{ matrix.groups }})
     runs-on: ubuntu-latest
