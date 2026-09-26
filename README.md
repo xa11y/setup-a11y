@@ -46,7 +46,7 @@ On macOS, grant the Accessibility permission to the process running your tests:
 | `package-groups` | `base` | Space-separated apt package groups to install on Linux. Available: `base`, `gtk`, `electron`, `link`. See [`apt-packages.txt`](./apt-packages.txt). |
 | `extra-packages` | `""` | Additional apt packages to install on Linux (space-separated). |
 | `install-deps` | `true` | Install system dependencies on Linux. Set to `false` to skip apt entirely. |
-| `apt-cache-version` | `1` | Cache-busting version for the apt package cache. Bump when the package set changes. |
+| `apt-cache-version` | `2` | Deprecated compatibility input; apt packages are installed directly. |
 | `setup-display` | `true` | Start Xvfb and export `DISPLAY` (Linux only). |
 | `setup-atspi` | `true` | Start a D-Bus session + AT-SPI bridge and export their env (Linux only). |
 | `setup-window-manager` | `false` | Start fluxbox (Linux only). Some toolkits (e.g. egui via AccessKit) only publish their tree once a window manager has mapped the window. |
