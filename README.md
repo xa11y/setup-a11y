@@ -66,3 +66,12 @@ for stricter supply-chain guarantees, or use `@main` to track the latest.
 This action was previously published from `xa11y/xa11y` as
 `xa11y/xa11y/.github/actions/setup-a11y`. It now lives here for a cleaner
 reference name: `xa11y/setup-a11y`.
+
+## Daily canary
+
+The [daily canary](./.github/workflows/nightly-integ.yml) tests the released
+`v1` action against `xa11y/xa11y` at 07:00 UTC. It probes the installed
+libraries and AT-SPI bus, then runs the xa11y workspace tests. A failed run
+opens one issue in this repository; later failures reuse the open issue.
+GitHub can disable scheduled workflows after prolonged repository inactivity,
+so check that the canary workflow remains enabled after quiet periods.

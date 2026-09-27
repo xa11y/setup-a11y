@@ -1,10 +1,10 @@
-name: Nightly integ (xa11y)
+name: Daily setup-a11y canary
 
-# Regression canary: runs the real xa11y integration tests against the action
-# as published on main. Catches breakage that hermetic CI can't see — e.g. an
+# Regression canary: runs the real xa11y integration tests against the released
+# v1 action. Catches breakage that PR CI can't see — e.g. an
 # Ubuntu security point-release purging a transitively-pinned .deb (the
 # libnghttp2-dev 404 that installed zero packages), or upstream xa11y changes
-# that need new system deps. Runs nightly and on demand.
+# that need new system deps. Runs daily and on demand; failures open one issue.
 
 on:
   schedule:
@@ -37,11 +37,19 @@ jobs:
           # read access to xa11y/xa11y) and it will be used instead.
           token: ${{ secrets.INTEG_REPO_TOKEN || github.token }}
 
-      - name: Set up accessibility environment (setup-a11y@main)
-        uses: xa11y/setup-a11y@main
+      - name: Set up accessibility environment (setup-a11y@v1)
+        uses: xa11y/setup-a11y@v1
         with:
           package-groups: base gtk electron
           setup-window-manager: "true"
+
+      - name: Probe installed dependencies and AT-SPI bus
+        run: |
+          set -euo pipefail
+          pkg-config --exists --print-errors xkbcommon gtk4 webkit2gtk-4.1
+          command -v dbus-launch
+          dbus-send --session --print-reply --dest=org.a11y.Bus \
+            /org/a11y/bus org.a11y.Bus.GetAddress | grep -q 'unix:'
 
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
@@ -60,3 +68,20 @@ jobs:
         # Mirrors the Linux job that surfaced the -lxkbcommon failure. Adjust to
         # the specific integ crate/command if xa11y narrows this later.
         run: cargo test --workspace --no-fail-fast
+
+  report-failure:
+    name: Open issue on canary failure
+    needs: integ
+    if: ${{ always() && needs.integ.result == 'failure' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Open or reuse the failure issue
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const { reportCanaryFailure } = require(`${process.env.GITHUB_WORKSPACE}/scripts/report-canary-failure.js`);
+            await reportCanaryFailure({ github, context, core });
