@@ -200,24 +200,9 @@ runs:
     - name: Configure macOS accessibility permission
       if: ${{ runner.os == 'macOS' }}
       shell: bash
-      run: |
-        set -euo pipefail
-        client="${{ inputs.macos-tcc-client }}"
-        if [ -z "$client" ]; then
-          echo "::warning::setup-a11y: macOS accessibility tests need the test process granted kTCCServiceAccessibility, but no 'macos-tcc-client' was provided. Trees will come back empty until the permission is granted. See https://xa11y.dev/guides/ci/#macos"
-          exit 0
-        fi
-        echo "Granting TCC kTCCServiceAccessibility to: $client"
-        # GitHub-hosted macOS runners allow sudo writes to the system TCC db
-        # (SIP only covers /System/*). Named columns keep the INSERT working
-        # across macOS versions regardless of extra columns.
-        sudo sqlite3 "/Library/Application Support/com.apple.TCC/TCC.db" \
-          "INSERT OR REPLACE INTO access(service,client,client_type,auth_value,auth_reason,auth_version,csreq,policy_id,indirect_object_identifier_type,indirect_object_identifier,indirect_object_code_identity,flags,last_modified) \
-           VALUES('kTCCServiceAccessibility','${client}',1,2,4,1,NULL,NULL,0,'UNUSED',NULL,0,$(date +%s));"
-        # Restart tccd so the grant is picked up without waiting for the next
-        # natural reload cycle. launchctl stop triggers an auto-restart.
-        sudo launchctl stop com.apple.tccd 2>/dev/null || true
-        sleep 2
+      env:
+        MACOS_TCC_CLIENT: ${{ inputs.macos-tcc-client }}
+      run: bash "${GITHUB_ACTION_PATH}/scripts/grant-macos-tcc.sh" "$MACOS_TCC_CLIENT"
 
     # ── Windows: nothing to do ─────────────────────────────────────────
     - name: Windows accessibility note

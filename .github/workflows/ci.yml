@@ -30,6 +30,13 @@ jobs:
           node-version: "22"
       - run: node --test scripts/report-canary-failure.test.js
 
+  macos-tcc-retries:
+    name: TCC retry regression tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 -m unittest discover -s scripts -p "test_*.py"
+
   linux:
     name: linux (${{ matrix.groups }})
     runs-on: ubuntu-latest
@@ -101,8 +108,19 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Run setup-a11y (macOS path)
+      - name: Run setup-a11y (macOS warning)
         uses: ./
+      - name: Run setup-a11y (macOS grant)
+        uses: ./
+        with:
+          macos-tcc-client: /bin/bash
+      - name: Assert the Accessibility grant was written
+        shell: bash
+        run: |
+          set -euo pipefail
+          granted=$(sudo sqlite3 -cmd ".timeout 10000" "/Library/Application Support/com.apple.TCC/TCC.db" \
+            "SELECT auth_value FROM access WHERE service='kTCCServiceAccessibility' AND client='/bin/bash' AND client_type=1 AND indirect_object_identifier='UNUSED';")
+          test "$granted" = "2"
 
   windows:
     runs-on: windows-latest
